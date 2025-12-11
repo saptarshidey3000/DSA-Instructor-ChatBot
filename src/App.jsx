@@ -2,11 +2,11 @@ import ChatContainer from './components/ChatContainer';
 
 /**
  * Main App Component
- * Entry point of our application
+ * Entry point of the application
  */
 function App() {
   return (
-    // ChatContainer handles everything - we just render it!
+    // ChatContainer is now fully featured!
     <ChatContainer />
   );
 }

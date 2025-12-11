@@ -2,88 +2,108 @@ import { useState } from "react";
 
 /**
  * ChatInput Component
- * Input box and send button for user messages
- * 
- * Props:
- * - onSendMessage: function to call when user sends a message
- * - disabled: whether input should be disabled (e.g., while loading)
+ * Enhanced input with character counter and better UX
  */
 function ChatInput({ onSendMessage, disabled }) {
-  // Local state to track what user is typing
-  // This is the text in the input box
   const [input, setInput] = useState("");
+  
+  // Maximum message length (Gemini has token limits)
+  const MAX_LENGTH = 500;
+  
+  // Calculate remaining characters
+  const remaining = MAX_LENGTH - input.length;
+  
+  // Determine if we're near the limit
+  const isNearLimit = remaining < 50;
+  const isOverLimit = remaining < 0;
 
-  /**
-   * Handles sending the message
-   * Called when user clicks Send button or presses Enter
-   */
   const handleSend = () => {
-    // Trim removes whitespace from start and end
-    // If message is empty or only spaces, don't send
-    if (input.trim() === "") return;
-
-    // Call the parent component's function with the message
-    // Parent (ChatContainer) will handle sending to API
+    // Don't send if empty or over limit
+    if (input.trim() === "" || isOverLimit) return;
+    
     onSendMessage(input);
-
-    // Clear the input box after sending
     setInput("");
   };
 
-  /**
-   * Handles Enter key press
-   * Allows users to send message by pressing Enter (not Shift+Enter)
-   */
   const handleKeyPress = (e) => {
-    // Check if Enter was pressed (not Shift+Enter)
-    // e.key is the key that was pressed
-    // e.shiftKey is true if Shift was held down
     if (e.key === "Enter" && !e.shiftKey) {
-      // Prevent default Enter behavior (adding new line)
       e.preventDefault();
-      // Send the message
       handleSend();
     }
-    // If Shift+Enter, allow default behavior (new line)
   };
 
   return (
-    <div className="border-t border-gray-300 bg-white p-4">
-      {/* flex makes input and button sit side by side */}
-      <div className="flex gap-2">
-        {/* Text input box */}
-        <input
-          type="text"
-          // value connects input to state (controlled component)
-          value={input}
-          // onChange updates state every time user types
-          // e.target.value is the current text in the input
-          onChange={(e) => setInput(e.target.value)}
-          // onKeyPress handles Enter key
-          onKeyPress={handleKeyPress}
-          // Disable input while loading
-          disabled={disabled}
-          placeholder="Ask me anything about DSA..."
-          // flex-1 makes input take all available space
-          // border, rounded, px-4, py-2 are styling classes
-          className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-        />
+    <div className="border-t border-gray-200 bg-white p-4 shadow-lg">
+      <div className="max-w-6xl mx-auto">
+        {/* Input container */}
+        <div className="flex gap-3">
+          {/* Text input */}
+          <div className="flex-1 relative">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyPress={handleKeyPress}
+              disabled={disabled}
+              placeholder="Ask me anything about DSA..."
+              maxLength={MAX_LENGTH} // HTML max length validation
+              className={`w-full border rounded-xl px-5 py-3 pr-16 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed ${
+                isOverLimit
+                  ? "border-red-500 focus:ring-red-500"
+                  : "border-gray-300"
+              }`}
+            />
+            
+            {/* Character counter - positioned inside input */}
+            <div
+              className={`absolute right-4 top-1/2 -translate-y-1/2 text-xs font-medium ${
+                isOverLimit
+                  ? "text-red-600"
+                  : isNearLimit
+                  ? "text-orange-500"
+                  : "text-gray-400"
+              }`}
+            >
+              {remaining}
+            </div>
+          </div>
 
-        {/* Send button */}
-        <button
-          onClick={handleSend}
-          // Disable if input is empty or while loading
-          disabled={disabled || input.trim() === ""}
-          className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-        >
-          Send
-        </button>
+          {/* Send button */}
+          <button
+            onClick={handleSend}
+            disabled={disabled || input.trim() === "" || isOverLimit}
+            className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed shadow-md hover:shadow-lg flex items-center gap-2"
+          >
+            {/* Icon changes based on state */}
+            {disabled ? (
+              <>
+                <span className="animate-spin">⏳</span>
+                <span>Sending...</span>
+              </>
+            ) : (
+              <>
+                <span>Send</span>
+                <span>🚀</span>
+              </>
+            )}
+          </button>
+        </div>
+        
+        {/* Helper text */}
+        <div className="flex items-center justify-between mt-2 px-1">
+          <p className="text-xs text-gray-500">
+            Press <kbd className="px-2 py-0.5 bg-gray-100 border border-gray-300 rounded text-xs">Enter</kbd> to send, 
+            <kbd className="px-2 py-0.5 bg-gray-100 border border-gray-300 rounded text-xs ml-1">Shift+Enter</kbd> for new line
+          </p>
+          
+          {/* Warning if over limit */}
+          {isOverLimit && (
+            <p className="text-xs text-red-600 font-medium">
+              Message too long! Please shorten it.
+            </p>
+          )}
+        </div>
       </div>
-
-      {/* Hint text below input */}
-      <p className="text-xs text-gray-500 mt-2">
-        Press Enter to send, Shift+Enter for new line
-      </p>
     </div>
   );
 }

@@ -1,145 +1,156 @@
 import { useState, useEffect, useRef } from "react";
+import Header from "./Header";
 import ChatMessage from "./ChatMessage";
 import ChatInput from "./ChatInput";
+import LoadingMessage from "./LoadingMessage";
+import EmptyState from "./EmptyState";
 import { sendMessageToGemini } from "../services/geminiService";
 import { WELCOME_MESSAGE } from "../constants/prompts";
 
 /**
  * ChatContainer Component
- * The main chat interface that manages messages and API calls
+ * Main chat interface with all improvements
  */
 function ChatContainer() {
-  // State: Array of all messages in the chat
-  // Each message: { role: "user" | "assistant", content: "text" }
-  const [messages, setMessages] = useState([
-    // Start with welcome message from AI
-    { role: "assistant", content: WELCOME_MESSAGE },
-  ]);
-
-  // State: Is the AI currently generating a response?
+  // State: Messages array
+  const [messages, setMessages] = useState([]);
+  
+  // State: Loading indicator
   const [loading, setLoading] = useState(false);
-
-  // State: Any error that occurred
+  
+  // State: Error message
   const [error, setError] = useState("");
-
-  // Ref: Reference to the messages container div
-  // Refs let us access DOM elements directly
-  // We'll use this to auto-scroll to bottom when new messages arrive
+  
+  // Ref: For auto-scrolling
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
+  
+  // Check if chat is empty (no messages yet)
+  const isEmpty = messages.length === 0;
 
   /**
-   * Scrolls chat to bottom
-   * Called after new messages are added
+   * Scroll to bottom of messages
    */
   const scrollToBottom = () => {
-    // messagesEndRef.current is the actual DOM element
-    // scrollIntoView smoothly scrolls it into view
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   /**
-   * useEffect: Runs after every render when messages change
-   * This automatically scrolls to bottom when new messages arrive
+   * Auto-scroll when messages change
    */
   useEffect(() => {
     scrollToBottom();
-  }, [messages]); // Dependency array: run this effect when messages changes
+  }, [messages, loading]); // Also scroll when loading changes
 
   /**
-   * Handles sending a user message
-   * This function is passed to ChatInput as a prop
+   * Handle sending a message
+   * Can be called from ChatInput or EmptyState suggestions
    */
   const handleSendMessage = async (userMessage) => {
     // Clear any previous errors
     setError("");
-
-    // Add user's message to the chat immediately
-    // Spread operator [...] creates new array with existing + new message
+    
+    // Validate message
+    if (!userMessage || userMessage.trim() === "") {
+      setError("Please enter a message");
+      return;
+    }
+    
+    // Add user's message immediately
     const userMessageObj = { role: "user", content: userMessage };
-    setMessages((prevMessages) => [...prevMessages, userMessageObj]);
-
-    // Set loading to true (shows loading indicator)
+    setMessages((prev) => [...prev, userMessageObj]);
+    
+    // Set loading state
     setLoading(true);
 
     try {
-      // Call the Gemini API
-      // await pauses until we get response
+      // Call Gemini API
       const aiResponse = await sendMessageToGemini(userMessage);
-
-      // Add AI's response to the chat
+      
+      // Add AI response to messages
       const aiMessageObj = { role: "assistant", content: aiResponse };
-      setMessages((prevMessages) => [...prevMessages, aiMessageObj]);
+      setMessages((prev) => [...prev, aiMessageObj]);
+      
     } catch (err) {
-      // If API call fails, show error message
-      setError(err.message);
-
-      // Also add error as a message in chat
+      // Handle errors gracefully
+      console.error("Error sending message:", err);
+      
+      // Show error to user
+      setError(err.message || "Something went wrong. Please try again.");
+      
+      // Add error message to chat
       const errorMessageObj = {
         role: "assistant",
-        content: `❌ Sorry, I encountered an error: ${err.message}`,
+        content: `❌ I apologize, but I encountered an error: ${err.message}\n\nPlease try again. If the problem persists, check your internet connection and API key.`,
       };
-      setMessages((prevMessages) => [...prevMessages, errorMessageObj]);
+      setMessages((prev) => [...prev, errorMessageObj]);
+      
     } finally {
-      // Whether success or error, stop loading
+      // Always stop loading, whether success or error
       setLoading(false);
     }
   };
+  
+  /**
+   * Handle clicking a suggestion in EmptyState
+   */
+  const handleSuggestionClick = (question) => {
+    handleSendMessage(question);
+  };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <div className="flex flex-col h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 shadow-lg">
-        <h1 className="text-2xl font-bold">DSA Instructor</h1>
-        <p className="text-sm opacity-90">
-          Your personal Data Structures & Algorithms tutor
-        </p>
-      </div>
+      <Header />
 
       {/* Messages Container */}
-      {/* flex-1 makes this take all available space between header and input */}
-      {/* overflow-y-auto adds scrollbar if content overflows */}
-      <div className="flex-1 overflow-y-auto p-4">
-        {/* Map over messages array and render ChatMessage for each */}
-        {messages.map((message, index) => (
-          // key helps React identify which items changed
-          // index is okay here since messages are never reordered
-          <ChatMessage
-            key={index}
-            role={message.role}
-            content={message.content}
-          />
-        ))}
-
-        {/* Loading indicator - only shown when loading is true */}
-        {loading && (
-          <div className="flex justify-start mb-4">
-            <div className="bg-gray-200 rounded-lg px-4 py-3 rounded-bl-none">
-              <p className="text-xs font-semibold mb-1 opacity-70">
-                AI Instructor
-              </p>
-              <p className="text-sm text-gray-600">Thinking...</p>
-              {/* Animated dots */}
-              <div className="flex gap-1 mt-2">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Invisible div at the end - used for auto-scroll */}
-        <div ref={messagesEndRef} />
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto"
+      >
+        <div className="max-w-4xl mx-auto px-4 py-6">
+          {/* Show EmptyState if no messages */}
+          {isEmpty ? (
+            <EmptyState onSuggestionClick={handleSuggestionClick} />
+          ) : (
+            <>
+              {/* Render all messages */}
+              {messages.map((message, index) => (
+                <ChatMessage
+                  key={index}
+                  role={message.role}
+                  content={message.content}
+                />
+              ))}
+              
+              {/* Show loading indicator */}
+              {loading && <LoadingMessage />}
+              
+              {/* Invisible div for auto-scroll */}
+              <div ref={messagesEndRef} />
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Error display - only shown if error exists */}
+      {/* Error Display - sticky at top of input area */}
       {error && (
-        <div className="bg-red-50 border-t border-red-200 px-4 py-2">
-          <p className="text-sm text-red-600">⚠️ {error}</p>
+        <div className="bg-red-50 border-t border-red-200 px-4 py-3 animate-fadeIn">
+          <div className="max-w-4xl mx-auto flex items-center gap-2">
+            <span className="text-red-600">⚠️</span>
+            <p className="text-sm text-red-700 flex-1">{error}</p>
+            {/* Close button */}
+            <button
+              onClick={() => setError("")}
+              className="text-red-600 hover:text-red-800 font-bold"
+            >
+              ✕
+            </button>
+          </div>
         </div>
       )}
 
-      {/* Input box at bottom */}
+      {/* Input Area */}
       <ChatInput onSendMessage={handleSendMessage} disabled={loading} />
     </div>
   );
